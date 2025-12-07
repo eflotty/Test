@@ -1,0 +1,49 @@
+[
+  {
+    "formIndex": 0,
+    "action": "ref: <Node>",
+    "method": "post",
+    "fields": [
+      {
+        "tag": "INPUT",
+        "type": "hidden",
+        "name": "Action",
+        "id": "action",
+        "class": "",
+        "placeholder": ""
+      },
+      {
+        "tag": "INPUT",
+        "type": "hidden",
+        "name": "SubAction",
+        "id": "subaction",
+        "class": "",
+        "placeholder": ""
+      },
+      {
+        "tag": "INPUT",
+        "type": "hidden",
+        "name": "_csrf_token",
+        "id": "_csrf_token",
+        "class": "",
+        "placeholder": ""
+      },
+      {
+        "tag": "INPUT",
+        "type": "text",
+        "name": "weblogin_username",
+        "id": "weblogin_username",
+        "class": "fillin character",
+        "placeholder": ""
+      },
+      {
+        "tag": "INPUT",
+        "type": "password",
+        "name": "weblogin_password",
+        "id": "weblogin_password",
+        "class": "fillin character",
+        "placeholder": ""
+      }
+    ]
+  }
+]

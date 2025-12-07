@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: golf-booking-api
+    env: node
+    buildCommand: npm install
+    startCommand: node api-server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ENCRYPTION_KEY
+        generateValue: true
+    healthCheckPath: /api/health
+
