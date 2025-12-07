@@ -57,7 +57,14 @@ const CONFIG = {
     
     // Cart/confirmation
     cartLink: 'a[href*="cart"]',
-    checkoutButton: 'input[value="Checkout"]',
+    checkoutButton: 'input[value="Checkout"], button[value="Checkout"], input[type="submit"][value*="Checkout"], button[type="submit"]:has-text("Checkout")',
+    proceedButton: 'input[value*="Proceed"], button[value*="Proceed"], input[type="submit"][value*="Proceed"]',
+    confirmButton: 'input[value*="Confirm"], button[value*="Confirm"], input[type="submit"][value*="Confirm"]',
+    completeButton: 'input[value*="Complete"], button[value*="Complete"], input[type="submit"][value*="Complete"]',
+    finalizeButton: 'input[value*="Finalize"], button[value*="Finalize"]',
+    // Success indicators
+    confirmationMessage: 'text=/confirmed|success|complete|thank you/i',
+    bookingNumber: '[class*="confirmation"], [id*="confirmation"], [class*="booking"]',
   },
   
   // Speed optimization
@@ -633,19 +640,19 @@ class AustinGolfBookingBot {
       
       if (booked) {
         console.log('\n✅ SUCCESS! Slot added to cart.');
-        console.log('👆 YOU CAN NOW TAKE OVER TO COMPLETE CHECKOUT\n');
         
-        // Try to navigate to cart
-        try {
-          const cartLink = this.page.locator(CONFIG.SELECTORS.cartLink);
-          if (await cartLink.isVisible({ timeout: 2000 })) {
-            console.log('🛒 Navigating to cart...');
-            await cartLink.click();
-          }
-        } catch (e) {
-          console.log('ℹ️  Cart link not found, but slot is in cart');
+        // Complete checkout automatically
+        const checkoutComplete = await this.completeCheckout();
+        
+        if (checkoutComplete) {
+          console.log('\n🎉 BOOKING FULLY COMPLETED!');
+          console.log('✅ Transaction confirmed and processed');
+        } else {
+          console.log('\n⚠️  Checkout may not have completed automatically');
+          console.log('👆 Please verify in the browser window');
         }
         
+        // Keep browser open for verification
         await this.waitForManualCompletion();
       } else {
         console.log('\n⚠️  No slots available yet. Check the browser window.');
@@ -666,6 +673,202 @@ class AustinGolfBookingBot {
       
       console.log('\n💡 Browser will stay open for manual intervention');
       await this.waitForManualCompletion();
+    }
+  }
+
+  /**
+   * Complete the checkout process automatically
+   */
+  async completeCheckout() {
+    console.log('\n' + '='.repeat(60));
+    console.log('🛒 COMPLETING CHECKOUT...');
+    console.log('='.repeat(60) + '\n');
+    
+    try {
+      // Step 1: Navigate to cart if not already there
+      const currentUrl = this.page.url();
+      if (!currentUrl.includes('cart') && !currentUrl.includes('checkout')) {
+        console.log('📍 Navigating to cart...');
+        try {
+          // Try multiple cart link selectors
+          const cartSelectors = [
+            CONFIG.SELECTORS.cartLink,
+            'a:has-text("Cart")',
+            'a:has-text("View Cart")',
+            'a[href*="cart"]',
+            '[class*="cart"]',
+            '[id*="cart"]'
+          ];
+          
+          let cartNavigated = false;
+          for (const selector of cartSelectors) {
+            try {
+              const cartLink = this.page.locator(selector).first();
+              if (await cartLink.isVisible({ timeout: 2000 })) {
+                await cartLink.click();
+                await this.page.waitForTimeout(2000); // Wait for cart to load
+                cartNavigated = true;
+                console.log('✅ Navigated to cart');
+                break;
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+          
+          if (!cartNavigated) {
+            // Try direct navigation
+            const cartUrl = currentUrl.replace(/search\.html.*/, 'cart.html') || 
+                           currentUrl.replace(/search/, 'cart');
+            console.log(`🔄 Trying direct navigation to: ${cartUrl}`);
+            await this.page.goto(cartUrl, { waitUntil: 'domcontentloaded', timeout: 5000 });
+            await this.page.waitForTimeout(2000);
+          }
+        } catch (e) {
+          console.log('⚠️  Could not navigate to cart automatically');
+          console.log('   Current URL:', currentUrl);
+        }
+      } else {
+        console.log('✅ Already on cart/checkout page');
+      }
+      
+      // Step 2: Find and click checkout button
+      console.log('\n🔍 Looking for checkout button...');
+      const checkoutSelectors = [
+        CONFIG.SELECTORS.checkoutButton,
+        'input[value*="Checkout" i]',
+        'button:has-text("Checkout")',
+        'input[type="submit"]',
+        'button[type="submit"]',
+        'a:has-text("Checkout")',
+        '[onclick*="checkout"]',
+        '[onclick*="Checkout"]'
+      ];
+      
+      let checkoutClicked = false;
+      for (const selector of checkoutSelectors) {
+        try {
+          const checkoutBtn = this.page.locator(selector).first();
+          if (await checkoutBtn.isVisible({ timeout: 2000 })) {
+            const buttonText = await checkoutBtn.textContent().catch(() => '') || 
+                             await checkoutBtn.getAttribute('value').catch(() => '');
+            console.log(`  ✓ Found checkout button: "${buttonText.trim()}"`);
+            await checkoutBtn.scrollIntoViewIfNeeded();
+            await checkoutBtn.click();
+            await this.page.waitForTimeout(3000); // Wait for checkout page to load
+            checkoutClicked = true;
+            console.log('✅ Checkout button clicked');
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      if (!checkoutClicked) {
+        console.log('⚠️  Could not find checkout button');
+        console.log('📸 Taking screenshot...');
+        await this.page.screenshot({ path: `checkout-error-${Date.now()}.png`, fullPage: true });
+        return false;
+      }
+      
+      // Step 3: Handle any additional checkout steps (proceed, confirm, etc.)
+      console.log('\n🔍 Checking for additional checkout steps...');
+      await this.page.waitForTimeout(2000);
+      
+      // Look for proceed/confirm/complete buttons
+      const additionalSteps = [
+        { selector: CONFIG.SELECTORS.proceedButton, name: 'Proceed' },
+        { selector: CONFIG.SELECTORS.confirmButton, name: 'Confirm' },
+        { selector: CONFIG.SELECTORS.completeButton, name: 'Complete' },
+        { selector: CONFIG.SELECTORS.finalizeButton, name: 'Finalize' },
+        { selector: 'input[type="submit"]', name: 'Submit' },
+        { selector: 'button[type="submit"]', name: 'Submit' }
+      ];
+      
+      for (const step of additionalSteps) {
+        try {
+          const button = this.page.locator(step.selector).first();
+          if (await button.isVisible({ timeout: 2000 })) {
+            const buttonText = await button.textContent().catch(() => '') || 
+                             await button.getAttribute('value').catch(() => '');
+            console.log(`  ✓ Found ${step.name} button: "${buttonText.trim()}"`);
+            await button.scrollIntoViewIfNeeded();
+            await button.click();
+            await this.page.waitForTimeout(3000);
+            console.log(`✅ ${step.name} button clicked`);
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      // Step 4: Verify transaction completion
+      console.log('\n🔍 Verifying transaction completion...');
+      await this.page.waitForTimeout(3000);
+      
+      // Check for success indicators
+      const successIndicators = [
+        CONFIG.SELECTORS.confirmationMessage,
+        'text=/booking.*confirmed/i',
+        'text=/transaction.*complete/i',
+        'text=/thank you/i',
+        '[class*="success"]',
+        '[class*="confirmation"]',
+        '[id*="confirmation"]'
+      ];
+      
+      let transactionComplete = false;
+      for (const indicator of successIndicators) {
+        try {
+          const element = this.page.locator(indicator).first();
+          if (await element.isVisible({ timeout: 2000 })) {
+            const text = await element.textContent().catch(() => '');
+            console.log(`  ✓ Found success indicator: "${text.trim().substring(0, 100)}"`);
+            transactionComplete = true;
+            break;
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+      
+      // Check URL for confirmation
+      const finalUrl = this.page.url();
+      if (finalUrl.includes('confirm') || finalUrl.includes('success') || finalUrl.includes('complete')) {
+        console.log('  ✓ URL indicates completion:', finalUrl);
+        transactionComplete = true;
+      }
+      
+      // Take final screenshot
+      console.log('\n📸 Taking final screenshot...');
+      await this.page.screenshot({ 
+        path: `checkout-final-${Date.now()}.png`, 
+        fullPage: true 
+      });
+      
+      if (transactionComplete) {
+        console.log('\n' + '='.repeat(60));
+        console.log('✅ TRANSACTION COMPLETED SUCCESSFULLY!');
+        console.log('='.repeat(60));
+        console.log('📸 Screenshot saved for verification');
+        console.log('🌐 Final URL:', finalUrl);
+        return true;
+      } else {
+        console.log('\n⚠️  Could not verify transaction completion');
+        console.log('📸 Screenshot saved - please verify manually');
+        console.log('🌐 Current URL:', finalUrl);
+        return false;
+      }
+      
+    } catch (error) {
+      console.error('\n❌ Error during checkout:', error.message);
+      console.log('📸 Taking error screenshot...');
+      await this.page.screenshot({ 
+        path: `checkout-error-${Date.now()}.png`, 
+        fullPage: true 
+      });
+      return false;
     }
   }
 
