@@ -59,7 +59,7 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    if (!targetHour !== undefined || targetMinute !== undefined) {
+    if (targetHour === undefined || targetMinute === undefined) {
       return res.status(400).json({ error: 'Target hour and minute are required' });
     }
 
