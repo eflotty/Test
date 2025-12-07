@@ -51,7 +51,8 @@ app.post('/api/bookings', async (req, res) => {
       timeStart,
       timeEnd,
       targetHour,
-      targetMinute
+      targetMinute,
+      testMode
     } = req.body;
 
     // Validate required fields
@@ -85,6 +86,7 @@ app.post('/api/bookings', async (req, res) => {
       timeEnd: timeEnd || '18:00',
       targetHour: parseInt(targetHour),
       targetMinute: parseInt(targetMinute),
+      testMode: testMode === true || testMode === 'true', // Store test mode preference
       status: 'scheduled',
       scheduledFor: scheduledDate.toISOString(),
       createdAt: new Date().toISOString(),
@@ -98,6 +100,7 @@ app.post('/api/bookings', async (req, res) => {
     console.log(`[${timestamp}] 📅 Scheduled for: ${scheduledDate.toLocaleString()}`);
     console.log(`[${timestamp}] ⏰ Target time: ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`);
     console.log(`[${timestamp}] 🏌️  Course: ${course}, Players: ${players}, Holes: ${holes}`);
+    console.log(`[${timestamp}] 🧪 Test Mode: ${booking.testMode ? 'ENABLED' : 'DISABLED'}`);
 
     // Return booking (without password)
     const { password: _, ...bookingResponse } = booking;

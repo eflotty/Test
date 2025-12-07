@@ -118,6 +118,11 @@ async function executeBot(bookingConfig) {
     const path = require('path');
     
     // Set environment variables for the bot
+    // Use booking's testMode preference, or fall back to environment variable, or default to true for safety
+    const testModeValue = bookingConfig.testMode !== undefined 
+      ? (bookingConfig.testMode ? 'true' : 'false')
+      : (process.env.TEST_MODE || 'true');
+    
     const env = {
       ...process.env,
       BOOKING_ID: bookingConfig.id,
@@ -132,8 +137,10 @@ async function executeBot(bookingConfig) {
       TARGET_HOUR: bookingConfig.targetHour,
       TARGET_MINUTE: bookingConfig.targetMinute,
       API_URL: API_URL,
-      TEST_MODE: process.env.TEST_MODE || 'true' // Default to test mode for safety
+      TEST_MODE: testModeValue
     };
+    
+    console.log(`   🧪 Test Mode: ${testModeValue === 'true' ? 'ENABLED (simulation only)' : 'DISABLED (will actually book)'}`);
     
     console.log(`   🚀 Spawning bot process...`);
     console.log(`   📋 Environment: BOOKING_ID=${bookingConfig.id}, TARGET_HOUR=${bookingConfig.targetHour}, TARGET_MINUTE=${bookingConfig.targetMinute}`);
