@@ -251,69 +251,235 @@ class AustinGolfBookingBot {
     await this.page.waitForTimeout(500);
   }
 
+  /**
+   * Robust dropdown selection with scrolling and verification
+   */
+  async selectDropdownOption(selectLocator, value, label) {
+    try {
+      // Wait for dropdown to be visible
+      await selectLocator.waitFor({ state: 'visible', timeout: 3000 });
+      
+      // Scroll into view to ensure it's visible
+      await selectLocator.scrollIntoViewIfNeeded();
+      await this.page.waitForTimeout(200);
+      
+      // Try multiple selection methods
+      const selectElement = selectLocator.first();
+      
+      // Method 1: Direct selectOption (works for native <select>)
+      try {
+        await selectElement.selectOption({ value: String(value) }, { timeout: 2000 });
+        await this.page.waitForTimeout(300);
+        
+        // Verify selection was made
+        const selectedValue = await selectElement.inputValue();
+        if (selectedValue === String(value)) {
+          console.log(`  ✅ ${label}: Set to ${value} (verified)`);
+          return true;
+        }
+      } catch (e) {
+        // Try alternative methods
+      }
+      
+      // Method 2: Try by label/text
+      try {
+        await selectElement.selectOption({ label: String(value) }, { timeout: 2000 });
+        await this.page.waitForTimeout(300);
+        const selectedValue = await selectElement.inputValue();
+        if (selectedValue === String(value)) {
+          console.log(`  ✅ ${label}: Set to ${value} via label (verified)`);
+          return true;
+        }
+      } catch (e) {
+        // Continue to next method
+      }
+      
+      // Method 3: Click and select from dropdown (for custom dropdowns)
+      try {
+        await selectElement.click();
+        await this.page.waitForTimeout(300);
+        
+        // Look for option in dropdown
+        const option = this.page.locator(`option[value="${value}"], option:has-text("${value}")`).first();
+        if (await option.isVisible({ timeout: 1000 })) {
+          await option.scrollIntoViewIfNeeded();
+          await option.click();
+          await this.page.waitForTimeout(300);
+          
+          const selectedValue = await selectElement.inputValue();
+          if (selectedValue === String(value)) {
+            console.log(`  ✅ ${label}: Set to ${value} via click (verified)`);
+            return true;
+          }
+        }
+      } catch (e) {
+        // Continue
+      }
+      
+      console.log(`  ⚠️  ${label}: Could not verify selection`);
+      return false;
+    } catch (error) {
+      console.log(`  ❌ ${label}: Error - ${error.message}`);
+      return false;
+    }
+  }
+
   async setBookingParameters() {
-    console.log('⚙️  Setting booking parameters...');
+    console.log('\n⚙️  SETTING BOOKING PARAMETERS...');
+    console.log('='.repeat(60));
+    
+    const verification = {
+      date: false,
+      players: false,
+      holes: false
+    };
     
     try {
-      // Set course if needed (should already be in URL, but verify)
       // Set date
       if (CONFIG.DATE) {
-        console.log(`  📅 Setting date to ${CONFIG.DATE}...`);
+        console.log(`\n📅 Setting date to ${CONFIG.DATE}...`);
         try {
-          // Look for date input field
-          const dateInput = this.page.locator('input[name*="date"], input[id*="date"], input[type="date"]').first();
-          if (await dateInput.isVisible({ timeout: 2000 })) {
-            await dateInput.fill(CONFIG.DATE);
-            await this.page.waitForTimeout(500);
-          } else {
-            // Try clicking date picker button
-            const dateButton = this.page.locator('button[id*="date"], button[class*="datepicker"]').first();
-            if (await dateButton.isVisible({ timeout: 2000 })) {
-              await dateButton.click();
-              await this.page.waitForTimeout(500);
-              // Fill date in the picker
-              const datePickerInput = this.page.locator('input[type="text"][value*="/"]').first();
-              if (await datePickerInput.isVisible({ timeout: 1000 })) {
-                await datePickerInput.fill(CONFIG.DATE);
+          // Try multiple date input selectors
+          const dateSelectors = [
+            'input[name*="date"]',
+            'input[id*="date"]',
+            'input[type="date"]',
+            'input[type="text"][name*="date"]',
+            '#date',
+            '[name="date"]'
+          ];
+          
+          let dateSet = false;
+          for (const selector of dateSelectors) {
+            try {
+              const dateInput = this.page.locator(selector).first();
+              if (await dateInput.isVisible({ timeout: 1000 })) {
+                await dateInput.scrollIntoViewIfNeeded();
+                await dateInput.fill('');
+                await dateInput.fill(CONFIG.DATE);
+                await this.page.waitForTimeout(300);
+                
+                // Verify
+                const value = await dateInput.inputValue();
+                if (value.includes(CONFIG.DATE.split('-')[2])) { // Check if date was set
+                  console.log(`  ✅ Date set to ${CONFIG.DATE} (verified)`);
+                  verification.date = true;
+                  dateSet = true;
+                  break;
+                }
               }
+            } catch (e) {
+              continue;
             }
           }
+          
+          if (!dateSet) {
+            console.log('  ⚠️  Could not set date - may need manual selection');
+          }
         } catch (e) {
-          console.log('  ⚠️  Could not set date automatically');
+          console.log(`  ⚠️  Date selection error: ${e.message}`);
         }
       }
       
-      // Set number of players
+      // Set number of players with robust selection
       if (CONFIG.PLAYERS) {
-        console.log(`  👥 Setting players to ${CONFIG.PLAYERS}...`);
-        try {
-          const playersSelect = this.page.locator(`select[name*="player"], select[id*="player"]`).first();
-          if (await playersSelect.isVisible({ timeout: 2000 })) {
-            await playersSelect.selectOption(String(CONFIG.PLAYERS));
-            await this.page.waitForTimeout(500);
+        console.log(`\n👥 Setting players to ${CONFIG.PLAYERS}...`);
+        const playersSelectors = [
+          'select[name*="player"]',
+          'select[id*="player"]',
+          'select[name*="Player"]',
+          'select[id*="Player"]',
+          '#players',
+          '[name="players"]'
+        ];
+        
+        let playersSet = false;
+        for (const selector of playersSelectors) {
+          try {
+            const playersSelect = this.page.locator(selector).first();
+            if (await playersSelect.isVisible({ timeout: 1000 })) {
+              const success = await this.selectDropdownOption(playersSelect, CONFIG.PLAYERS, 'Players');
+              if (success) {
+                verification.players = true;
+                playersSet = true;
+                break;
+              }
+            }
+          } catch (e) {
+            continue;
           }
-        } catch (e) {
-          console.log('  ⚠️  Could not set players automatically');
+        }
+        
+        if (!playersSet) {
+          console.log('  ⚠️  Could not set players - may need manual selection');
         }
       }
       
-      // Set number of holes
+      // Set number of holes with robust selection
       if (CONFIG.HOLES) {
-        console.log(`  ⛳ Setting holes to ${CONFIG.HOLES}...`);
-        try {
-          const holesSelect = this.page.locator(`select[name*="hole"], select[id*="hole"]`).first();
-          if (await holesSelect.isVisible({ timeout: 2000 })) {
-            await holesSelect.selectOption(String(CONFIG.HOLES));
-            await this.page.waitForTimeout(500);
+        console.log(`\n⛳ Setting holes to ${CONFIG.HOLES}...`);
+        const holesSelectors = [
+          'select[name*="hole"]',
+          'select[id*="hole"]',
+          'select[name*="Hole"]',
+          'select[id*="Hole"]',
+          '#holes',
+          '[name="holes"]'
+        ];
+        
+        let holesSet = false;
+        for (const selector of holesSelectors) {
+          try {
+            const holesSelect = this.page.locator(selector).first();
+            if (await holesSelect.isVisible({ timeout: 1000 })) {
+              const success = await this.selectDropdownOption(holesSelect, CONFIG.HOLES, 'Holes');
+              if (success) {
+                verification.holes = true;
+                holesSet = true;
+                break;
+              }
+            }
+          } catch (e) {
+            continue;
           }
-        } catch (e) {
-          console.log('  ⚠️  Could not set holes automatically');
+        }
+        
+        if (!holesSet) {
+          console.log('  ⚠️  Could not set holes - may need manual selection');
         }
       }
       
-      console.log('✅ Parameters set');
+      // Summary
+      console.log('\n' + '='.repeat(60));
+      console.log('📊 PARAMETER VERIFICATION:');
+      if (CONFIG.DATE) console.log(`  Date: ${verification.date ? '✅' : '⚠️'}`);
+      if (CONFIG.PLAYERS) console.log(`  Players: ${verification.players ? '✅' : '⚠️'}`);
+      if (CONFIG.HOLES) console.log(`  Holes: ${verification.holes ? '✅' : '⚠️'}`);
+      console.log('='.repeat(60));
+      
+      // Take screenshot for verification (in test mode or if verification failed)
+      const allVerified = (!CONFIG.DATE || verification.date) && 
+                          (!CONFIG.PLAYERS || verification.players) && 
+                          (!CONFIG.HOLES || verification.holes);
+      
+      if (!allVerified) {
+        console.log('\n📸 Taking screenshot for parameter verification...');
+        await this.page.screenshot({ 
+          path: `parameters-${Date.now()}.png`, 
+          fullPage: true 
+        });
+        console.log('  💡 Check screenshot to verify parameters were set correctly');
+      }
+      
+      console.log('\n✅ Parameter setting complete');
+      
     } catch (error) {
-      console.log('⚠️  Error setting parameters:', error.message);
+      console.log(`\n⚠️  Error setting parameters: ${error.message}`);
+      console.log('📸 Taking error screenshot...');
+      await this.page.screenshot({ 
+        path: `parameter-error-${Date.now()}.png`, 
+        fullPage: true 
+      });
     }
   }
 
@@ -612,6 +778,40 @@ class AustinGolfBookingBot {
     
     await this.waitForManualCompletion();
   }
+
+  async testParameters() {
+    console.log('🧪 TESTING PARAMETER SELECTION...\n');
+    console.log('This will test if the bot can correctly set all booking parameters.\n');
+    
+    await this.launch();
+    await this.login();
+    await this.navigateToBookingPage();
+    
+    console.log('\n' + '='.repeat(60));
+    console.log('⚙️  TESTING PARAMETER SELECTION');
+    console.log('='.repeat(60));
+    console.log(`Expected values:`);
+    console.log(`  Date: ${CONFIG.DATE || 'Not set'}`);
+    console.log(`  Players: ${CONFIG.PLAYERS || 'Not set'}`);
+    console.log(`  Holes: ${CONFIG.HOLES || 'Not set'}`);
+    console.log('='.repeat(60) + '\n');
+    
+    // Set parameters
+    await this.setBookingParameters();
+    
+    console.log('\n📸 Taking verification screenshot...');
+    const screenshotPath = `parameter-verification-${Date.now()}.png`;
+    await this.page.screenshot({ path: screenshotPath, fullPage: true });
+    console.log(`✅ Screenshot saved: ${screenshotPath}`);
+    console.log('\n👀 Please verify in the browser window that all parameters are set correctly.');
+    console.log('Press Enter when done inspecting...\n');
+    
+    await new Promise(resolve => {
+      process.stdin.once('data', resolve);
+    });
+    
+    await this.waitForManualCompletion();
+  }
 }
 
 // ============================================
@@ -837,6 +1037,9 @@ async function main() {
   } else if (args.includes('--test') || args.includes('-t')) {
     // Test selectors
     await bot.testSelectors();
+  } else if (args.includes('--test-params') || args.includes('-p')) {
+    // Test parameter selection
+    await bot.testParameters();
   } else {
     console.log(`
 🎯 AUSTIN GOLF BOOKING BOT
@@ -845,6 +1048,7 @@ async function main() {
 Usage:
   node austin-golf-bot.js --now        Run immediately (for testing/setup)
   node austin-golf-bot.js --test       Test all selectors and show results
+  node austin-golf-bot.js --test-params Test parameter selection (date, players, holes)
   node austin-golf-bot.js --schedule   Schedule for target time in CONFIG
 
 Setup Instructions:
