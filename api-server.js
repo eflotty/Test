@@ -93,7 +93,11 @@ app.post('/api/bookings', async (req, res) => {
 
     bookings.push(booking);
 
-    console.log(`✅ New booking created: ${booking.id} for ${scheduledDate.toLocaleString()}`);
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ✅ New booking created: ${booking.id}`);
+    console.log(`[${timestamp}] 📅 Scheduled for: ${scheduledDate.toLocaleString()}`);
+    console.log(`[${timestamp}] ⏰ Target time: ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`);
+    console.log(`[${timestamp}] 🏌️  Course: ${course}, Players: ${players}, Holes: ${holes}`);
 
     // Return booking (without password)
     const { password: _, ...bookingResponse } = booking;
@@ -189,14 +193,21 @@ app.put('/api/bookings/:id/status', (req, res) => {
       return res.status(404).json({ error: 'Booking not found' });
     }
 
+    const timestamp = new Date().toISOString();
+    const oldStatus = booking.status;
     booking.status = status;
-    booking.updatedAt = new Date().toISOString();
+    booking.updatedAt = timestamp;
     
     if (errorMessage) {
       booking.error = errorMessage;
     }
 
-    console.log(`✅ Booking ${req.params.id} status updated to: ${status}`);
+    console.log(`[${timestamp}] 📊 Status Update: Booking ${req.params.id.substring(0, 8)}...`);
+    console.log(`[${timestamp}]    ${oldStatus} → ${status}`);
+    if (errorMessage) {
+      console.log(`[${timestamp}]    Error: ${errorMessage}`);
+    }
+    
     res.json({ success: true, booking });
   } catch (error) {
     console.error('Error updating booking status:', error);

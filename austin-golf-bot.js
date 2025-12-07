@@ -882,4 +882,10 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-main();
+// Export the class for use by bot-runner
+module.exports = { AustinGolfBookingBot };
+
+// Only run main() if this file is executed directly
+if (require.main === module) {
+  main();
+}

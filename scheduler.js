@@ -103,14 +103,17 @@ async function updateBookingStatus(bookingId, status, error = null) {
  * Execute bot for a booking
  */
 async function executeBot(bookingConfig) {
-  console.log(`🤖 Executing bot for booking ${bookingConfig.id}...`);
+  const timestamp = new Date().toISOString();
+  console.log(`\n🤖 [${timestamp}] EXECUTING BOT FOR BOOKING ${bookingConfig.id}`);
+  console.log(`   Triggered at: ${new Date().toLocaleString()}`);
+  console.log(`   Scheduled for: ${new Date(bookingConfig.scheduledFor).toLocaleString()}`);
   
   // Update status to running
   await updateBookingStatus(bookingConfig.id, 'running');
+  console.log(`   ✅ Status updated to: running`);
   
   try {
     // Import and run the bot
-    // We'll create a bot runner that accepts config
     const { spawn } = require('child_process');
     const path = require('path');
     
@@ -128,8 +131,12 @@ async function executeBot(bookingConfig) {
       TIME_END: bookingConfig.timeEnd,
       TARGET_HOUR: bookingConfig.targetHour,
       TARGET_MINUTE: bookingConfig.targetMinute,
-      API_URL: API_URL
+      API_URL: API_URL,
+      TEST_MODE: process.env.TEST_MODE || 'true' // Default to test mode for safety
     };
+    
+    console.log(`   🚀 Spawning bot process...`);
+    console.log(`   📋 Environment: BOOKING_ID=${bookingConfig.id}, TARGET_HOUR=${bookingConfig.targetHour}, TARGET_MINUTE=${bookingConfig.targetMinute}`);
     
     // Run the bot
     const botProcess = spawn('node', [path.join(__dirname, 'bot-runner.js')], {
@@ -137,25 +144,36 @@ async function executeBot(bookingConfig) {
       stdio: 'inherit'
     });
     
+    console.log(`   ✅ Bot process started (PID: ${botProcess.pid})`);
+    
     // Wait for bot to complete
     await new Promise((resolve, reject) => {
       botProcess.on('close', (code) => {
+        const endTime = new Date().toISOString();
+        console.log(`\n   📊 [${endTime}] Bot process exited with code: ${code}`);
         if (code === 0) {
+          console.log(`   ✅ Bot execution completed successfully`);
           resolve();
         } else {
+          console.log(`   ❌ Bot execution failed with code ${code}`);
           reject(new Error(`Bot exited with code ${code}`));
         }
       });
       
-      botProcess.on('error', reject);
+      botProcess.on('error', (err) => {
+        console.error(`   ❌ Bot process error:`, err);
+        reject(err);
+      });
     });
     
     // Update status to completed
     await updateBookingStatus(bookingConfig.id, 'completed');
-    console.log(`✅ Booking ${bookingConfig.id} completed successfully`);
+    console.log(`   ✅ Booking ${bookingConfig.id} status updated to: completed`);
     
   } catch (error) {
-    console.error(`❌ Error executing bot for booking ${bookingConfig.id}:`, error);
+    const errorTime = new Date().toISOString();
+    console.error(`\n   ❌ [${errorTime}] Error executing bot for booking ${bookingConfig.id}:`, error);
+    console.error(`   Stack:`, error.stack);
     await updateBookingStatus(bookingConfig.id, 'failed', error.message);
   }
 }
@@ -165,39 +183,62 @@ async function executeBot(bookingConfig) {
  */
 async function checkAndExecuteBookings() {
   try {
-    console.log(`\n⏰ [${new Date().toLocaleString()}] Checking for upcoming bookings...`);
+    const timestamp = new Date().toISOString();
+    const now = new Date();
+    console.log(`\n${'='.repeat(60)}`);
+    console.log(`⏰ [${now.toLocaleString()}] Checking for upcoming bookings...`);
+    console.log(`📡 API URL: ${API_URL}`);
     
     const bookings = await fetchUpcomingBookings();
-    const now = new Date();
+    console.log(`📋 Total bookings in system: ${bookings.length}`);
     
     // Find bookings that need to be executed
     const upcomingBookings = bookings.filter(booking => {
-      if (booking.status !== 'scheduled') return false;
+      if (booking.status !== 'scheduled') {
+        console.log(`   ⏭️  Booking ${booking.id.substring(0, 8)}... status: ${booking.status} (skipping)`);
+        return false;
+      }
       
       const scheduledTime = new Date(booking.scheduledFor);
       const timeUntilExecution = scheduledTime - now;
       
       // Execute if scheduled time is within the next 2 minutes
-      return timeUntilExecution > 0 && timeUntilExecution <= PRE_POSITION_BUFFER;
+      const shouldExecute = timeUntilExecution > 0 && timeUntilExecution <= PRE_POSITION_BUFFER;
+      
+      if (shouldExecute) {
+        console.log(`   ✅ Booking ${booking.id.substring(0, 8)}... needs execution!`);
+        console.log(`      Scheduled: ${scheduledTime.toLocaleString()}`);
+        console.log(`      Time until: ${Math.round(timeUntilExecution / 1000)}s`);
+      } else {
+        console.log(`   ⏳ Booking ${booking.id.substring(0, 8)}... scheduled for ${scheduledTime.toLocaleString()} (${Math.round(timeUntilExecution / 1000)}s away)`);
+      }
+      
+      return shouldExecute;
     });
     
     if (upcomingBookings.length === 0) {
-      console.log('   No bookings to execute right now');
+      console.log(`   ℹ️  No bookings to execute right now`);
+      console.log('='.repeat(60));
       return;
     }
     
-    console.log(`   Found ${upcomingBookings.length} booking(s) to execute`);
+    console.log(`\n🚀 Found ${upcomingBookings.length} booking(s) ready to execute!`);
     
     // Execute each booking
     for (const booking of upcomingBookings) {
       const scheduledTime = new Date(booking.scheduledFor);
       const timeUntilExecution = scheduledTime - now;
       
-      console.log(`   📅 Booking ${booking.id} scheduled for ${scheduledTime.toLocaleString()}`);
-      console.log(`      Time until execution: ${Math.round(timeUntilExecution / 1000)}s`);
+      console.log(`\n📅 Executing Booking: ${booking.id}`);
+      console.log(`   Scheduled for: ${scheduledTime.toLocaleString()}`);
+      console.log(`   Current time: ${now.toLocaleString()}`);
+      console.log(`   Time until execution: ${Math.round(timeUntilExecution / 1000)}s`);
+      console.log(`   Course: ${booking.course}, Players: ${booking.players}`);
       
       // Get full config and execute
       const config = await getBookingConfig(booking.id);
+      
+      console.log(`   ✅ Config loaded, triggering bot execution...`);
       
       // Execute immediately (bot will handle timing internally)
       executeBot(config).catch(err => {
@@ -205,8 +246,11 @@ async function checkAndExecuteBookings() {
       });
     }
     
+    console.log('='.repeat(60));
+    
   } catch (error) {
-    console.error('❌ Error checking bookings:', error.message);
+    console.error(`❌ [${new Date().toISOString()}] Error checking bookings:`, error.message);
+    console.error(error.stack);
   }
 }
 
