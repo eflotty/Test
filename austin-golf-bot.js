@@ -1087,7 +1087,7 @@ process.on('SIGINT', () => {
 });
 
 // Export the class for use by bot-runner
-module.exports = { AustinGolfBookingBot };
+module.exports = AustinGolfBookingBot;
 
 // Only run main() if this file is executed directly
 if (require.main === module) {
