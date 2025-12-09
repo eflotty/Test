@@ -6,6 +6,7 @@
  */
 
 const http = require('http');
+const https = require('https');
 
 // Configuration
 const API_URL = process.env.API_URL || 'http://localhost:3000';
@@ -13,13 +14,21 @@ const POLL_INTERVAL = 60000; // Check every 60 seconds
 const PRE_POSITION_BUFFER = 120000; // Start bot 2 minutes before scheduled time
 
 /**
+ * Get the appropriate HTTP module based on URL protocol
+ */
+function getHttpModule(url) {
+  return url.protocol === 'https:' ? https : http;
+}
+
+/**
  * Fetch upcoming bookings from API
  */
 async function fetchUpcomingBookings() {
   return new Promise((resolve, reject) => {
     const url = new URL(`${API_URL}/api/bookings`);
+    const client = getHttpModule(url);
     
-    http.get(url, (res) => {
+    client.get(url, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk.toString(); });
       res.on('end', () => {
@@ -44,8 +53,9 @@ async function fetchUpcomingBookings() {
 async function getBookingConfig(bookingId) {
   return new Promise((resolve, reject) => {
     const url = new URL(`${API_URL}/api/bookings/${bookingId}/config`);
+    const client = getHttpModule(url);
     
-    http.get(url, (res) => {
+    client.get(url, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk.toString(); });
       res.on('end', () => {
@@ -71,6 +81,7 @@ async function updateBookingStatus(bookingId, status, error = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(`${API_URL}/api/bookings/${bookingId}/status`);
     const data = JSON.stringify({ status, error });
+    const client = getHttpModule(url);
     
     const options = {
       method: 'PUT',
@@ -80,7 +91,7 @@ async function updateBookingStatus(bookingId, status, error = null) {
       }
     };
     
-    const req = http.request(url, options, (res) => {
+    const req = client.request(url, options, (res) => {
       let responseData = '';
       res.on('data', (chunk) => { responseData += chunk.toString(); });
       res.on('end', () => {

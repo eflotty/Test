@@ -11,3 +11,12 @@ services:
         generateValue: true
     healthCheckPath: /api/health
 
+  - type: worker
+    name: golf-booking-scheduler
+    env: node
+    buildCommand: npm install
+    startCommand: node scheduler.js
+    envVars:
+      - key: API_URL
+        sync: false  # You'll need to set this manually to your API URL
+
