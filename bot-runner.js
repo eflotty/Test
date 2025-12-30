@@ -117,7 +117,11 @@ async function main() {
       
       if (!TEST_MODE) {
         // Import bot early
-        const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
+        const { AustinGolfBookingBot, applyConfigFromEnv } = require('./austin-golf-bot.js');
+        // Apply environment variables to bot's CONFIG
+        if (typeof applyConfigFromEnv === 'function') {
+          applyConfigFromEnv();
+        }
         bot = new AustinGolfBookingBot();
       }
       
@@ -165,7 +169,11 @@ async function main() {
       await updateStatus('running');
       
       if (!TEST_MODE) {
-        const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
+        const { AustinGolfBookingBot, applyConfigFromEnv } = require('./austin-golf-bot.js');
+        // Apply environment variables to bot's CONFIG
+        if (typeof applyConfigFromEnv === 'function') {
+          applyConfigFromEnv();
+        }
         bot = new AustinGolfBookingBot();
       }
     }
@@ -178,7 +186,11 @@ async function main() {
       console.log('🧪 TEST MODE: Simulated booking complete');
     } else {
       if (!bot) {
-        const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
+        const { AustinGolfBookingBot, applyConfigFromEnv } = require('./austin-golf-bot.js');
+        // Apply environment variables to bot's CONFIG
+        if (typeof applyConfigFromEnv === 'function') {
+          applyConfigFromEnv();
+        }
         bot = new AustinGolfBookingBot();
       }
       

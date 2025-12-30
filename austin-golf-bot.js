@@ -1220,11 +1220,36 @@ function applyConfig(fileConfig) {
   console.log(`   Booking Opens: ${CONFIG.TARGET_HOUR}:${String(CONFIG.TARGET_MINUTE).padStart(2, '0')}`);
 }
 
+/**
+ * Apply config from environment variables (used when called from scheduler)
+ */
+function applyConfigFromEnv() {
+  // Apply environment variables to CONFIG if they exist
+  if (process.env.USERNAME) CONFIG.USERNAME = process.env.USERNAME;
+  if (process.env.PASSWORD) CONFIG.PASSWORD = process.env.PASSWORD;
+  if (process.env.COURSE) CONFIG.COURSE = parseInt(process.env.COURSE);
+  if (process.env.DATE) CONFIG.DATE = process.env.DATE;
+  if (process.env.PLAYERS) CONFIG.PLAYERS = parseInt(process.env.PLAYERS);
+  if (process.env.HOLES) CONFIG.HOLES = parseInt(process.env.HOLES);
+  if (process.env.TIME_START) CONFIG.TIME_START = process.env.TIME_START;
+  if (process.env.TIME_END) CONFIG.TIME_END = process.env.TIME_END;
+  if (process.env.TARGET_HOUR) CONFIG.TARGET_HOUR = parseInt(process.env.TARGET_HOUR);
+  if (process.env.TARGET_MINUTE) CONFIG.TARGET_MINUTE = parseInt(process.env.TARGET_MINUTE);
+  
+  // Update booking URL with course
+  if (process.env.COURSE) {
+    CONFIG.BOOKING_URL = `https://txaustinweb.myvscloud.com/webtrac/web/search.html?display=detail&module=GR&secondarycode=${CONFIG.COURSE}`;
+  }
+}
+
 // ============================================
 // COMMAND LINE INTERFACE
 // ============================================
 async function main() {
-  // Load config from file or cloud if it exists
+  // First apply environment variables (used when called from scheduler)
+  applyConfigFromEnv();
+  
+  // Then load config from file or cloud if it exists (will override env vars if present)
   await loadConfigFromFile();
   
   const args = process.argv.slice(2);
@@ -1289,8 +1314,8 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Export the class for use by bot-runner
-module.exports = { AustinGolfBookingBot };
+// Export the class and config function for use by bot-runner
+module.exports = { AustinGolfBookingBot, applyConfigFromEnv };
 
 // Only run main() if this file is executed directly
 if (require.main === module) {
