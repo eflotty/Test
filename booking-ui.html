@@ -401,10 +401,21 @@
         // Set minimum date to today
         document.getElementById('date').min = new Date().toISOString().split('T')[0];
         
-        // Set booking opens date to today by default
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('bookingOpensDate').value = today;
-        document.getElementById('bookingOpensDate').min = today;
+        // Set booking opens date to today in Chicago CST timezone
+        function getTodayChicagoCST() {
+            const now = new Date();
+            // Chicago is UTC-6 (CST) or UTC-5 (CDT)
+            // Get Chicago time by creating date in that timezone
+            const chicagoTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
+            const year = chicagoTime.getFullYear();
+            const month = String(chicagoTime.getMonth() + 1).padStart(2, '0');
+            const day = String(chicagoTime.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        
+        const todayChicago = getTodayChicagoCST();
+        document.getElementById('bookingOpensDate').value = todayChicago;
+        document.getElementById('bookingOpensDate').min = todayChicago;
 
         // Load API URL on page load
         if (localStorage.getItem('apiUrl')) {
