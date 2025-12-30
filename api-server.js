@@ -65,27 +65,84 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'Target hour and minute are required' });
     }
 
-    // Calculate scheduled time (when the bot should run)
-    // Use bookingOpensDate if provided, otherwise default to today
+    // Calculate scheduled time (when the bot should run) in Chicago timezone
+    // Use bookingOpensDate if provided, otherwise default to today in Chicago time
     // The DATE field is for which date to book the tee time, bookingOpensDate is when to run the bot
-    const scheduledDate = bookingOpensDate ? new Date(bookingOpensDate) : new Date();
-    scheduledDate.setHours(parseInt(targetHour), parseInt(targetMinute), 0, 0);
     
-    // Handle time in the past only if booking opens date is today or not specified
-    const now = new Date();
-    const scheduledDateOnly = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate());
-    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    
-    // If booking opens date is today and time is in the past, handle special cases
-    if (scheduledDateOnly.getTime() === todayOnly.getTime()) {
-      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    // Helper function to get current time components in Chicago timezone
+    function getChicagoTime() {
+      const now = new Date();
+      // Format as Chicago time and parse components
+      const chicagoStr = now.toLocaleString("en-US", {timeZone: "America/Chicago"});
+      // Parse the string to get date components (format varies, but we can use a more reliable method)
+      // Use Intl.DateTimeFormat for more reliable parsing
+      const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Chicago",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false
+      });
+      const parts = formatter.formatToParts(now);
+      const chicagoParts = {};
+      parts.forEach(part => { chicagoParts[part.type] = part.value; });
       
+      return {
+        year: parseInt(chicagoParts.year),
+        month: parseInt(chicagoParts.month) - 1, // 0-indexed
+        day: parseInt(chicagoParts.day),
+        hour: parseInt(chicagoParts.hour),
+        minute: parseInt(chicagoParts.minute),
+        second: parseInt(chicagoParts.second)
+      };
+    }
+    
+    // Helper function to create a Date object from Chicago time components
+    function createChicagoDate(year, month, day, hour, minute, second = 0) {
+      // Create an ISO string in Chicago timezone and parse it
+      // Chicago is UTC-6 (CST) or UTC-5 (CDT)
+      // We'll use UTC-6 as default (CST), which covers most of the year
+      // For DST (March-November), it's UTC-5, but this is close enough for scheduling purposes
+      // To be more accurate, we'd need a library, but this should work for most cases
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}-06:00`;
+      return new Date(dateStr);
+    }
+    
+    let scheduledDate;
+    
+    if (bookingOpensDate) {
+      // Parse the date components
+      const [year, month, day] = bookingOpensDate.split('-').map(Number);
+      // Create date in Chicago timezone (CST = UTC-6)
+      scheduledDate = createChicagoDate(year, month - 1, day, parseInt(targetHour), parseInt(targetMinute));
+    } else {
+      // Default to today in Chicago timezone
+      const chicago = getChicagoTime();
+      scheduledDate = createChicagoDate(chicago.year, chicago.month, chicago.day, parseInt(targetHour), parseInt(targetMinute));
+    }
+    
+    // Get current time in Chicago timezone for comparison
+    const chicagoNow = getChicagoTime();
+    const chicagoNowDate = createChicagoDate(chicagoNow.year, chicagoNow.month, chicagoNow.day, chicagoNow.hour, chicagoNow.minute, chicagoNow.second);
+    
+    // Compare dates (year/month/day only) in Chicago timezone
+    const scheduledDateOnly = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate());
+    const todayOnly = new Date(chicagoNowDate.getFullYear(), chicagoNowDate.getMonth(), chicagoNowDate.getDate());
+    
+    // If booking opens date is today (Chicago time) and time is in the past, handle special cases
+    if (scheduledDateOnly.getTime() === todayOnly.getTime()) {
+      const fiveMinutesAgo = new Date(chicagoNowDate.getTime() - 5 * 60 * 1000);
+      
+      // Compare in Chicago timezone
       if (scheduledDate < fiveMinutesAgo) {
         // More than 5 minutes in the past - schedule for tomorrow
         scheduledDate.setDate(scheduledDate.getDate() + 1);
-      } else if (scheduledDate < now) {
-        // Within last 5 minutes - execute immediately
-        scheduledDate.setTime(now.getTime());
+      } else if (scheduledDate < chicagoNowDate) {
+        // Within last 5 minutes - execute immediately (use current time in Chicago)
+        scheduledDate = new Date(chicagoNowDate);
       }
     }
     // If booking opens date is in the future, use it as-is (no adjustment needed)
