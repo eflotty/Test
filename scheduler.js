@@ -7,10 +7,11 @@
 
 const http = require('http');
 const https = require('https');
+const { sendBookingCompletionEmail } = require('./email-service.js');
 
 // Configuration
 const API_URL = process.env.API_URL || 'http://localhost:3000';
-const POLL_INTERVAL = 60000; // Check every 60 seconds
+const POLL_INTERVAL = 30000; // Check every 30 seconds
 const PRE_POSITION_BUFFER = 180000; // Start bot 3 minutes before scheduled time (gives time for pre-positioning)
 
 /**
@@ -188,6 +189,20 @@ async function executeBot(bookingConfig) {
     // Update status to completed
     await updateBookingStatus(bookingConfig.id, 'completed');
     console.log(`   ✅ Booking ${bookingConfig.id} status updated to: completed`);
+    
+    // Send email notification
+    if (bookingConfig.username) {
+      console.log(`   📧 Sending completion email to ${bookingConfig.username}...`);
+      const bookingDetails = {
+        course: bookingConfig.course,
+        date: bookingConfig.date,
+        players: bookingConfig.players,
+        holes: bookingConfig.holes,
+      };
+      await sendBookingCompletionEmail(bookingConfig.username, bookingDetails).catch(err => {
+        console.error(`   ⚠️  Failed to send email: ${err.message}`);
+      });
+    }
     
   } catch (error) {
     const errorTime = new Date().toISOString();

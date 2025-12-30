@@ -84,9 +84,9 @@ class AustinGolfBookingBot {
   }
 
   async launch() {
-    console.log('🚀 Launching browser in incognito mode...');
+    console.log('🚀 Launching browser in headless mode...');
     this.browser = await chromium.launch({
-      headless: false,  // Keep visible so you can take over
+      headless: true,   // Headless mode for cloud deployment
       slowMo: 0,        // No delay - maximum speed
       args: [
         '--disable-blink-features=AutomationControlled',  // Avoid detection

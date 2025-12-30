@@ -13,13 +13,19 @@
     "api": "node api-server.js",
     "scheduler": "node scheduler.js"
   },
-  "keywords": ["booking", "automation", "golf", "austin"],
+  "keywords": [
+    "booking",
+    "automation",
+    "golf",
+    "austin"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "playwright": "^1.49.0",
+    "cors": "^2.8.5",
     "express": "^4.18.2",
-    "cors": "^2.8.5"
+    "nodemailer": "^6.10.1",
+    "playwright": "^1.49.0"
   },
   "engines": {
     "node": ">=18.0.0"
