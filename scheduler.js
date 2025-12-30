@@ -11,7 +11,7 @@ const https = require('https');
 // Configuration
 const API_URL = process.env.API_URL || 'http://localhost:3000';
 const POLL_INTERVAL = 60000; // Check every 60 seconds
-const PRE_POSITION_BUFFER = 120000; // Start bot 2 minutes before scheduled time
+const PRE_POSITION_BUFFER = 180000; // Start bot 3 minutes before scheduled time (gives time for pre-positioning)
 
 /**
  * Get the appropriate HTTP module based on URL protocol

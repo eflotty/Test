@@ -89,57 +89,122 @@ async function main() {
   
   try {
     // IMPORTANT: The scheduler triggers the bot when scheduledFor is within 2 minutes
-    // We should wait until the exact scheduledFor time, then execute
+    // We should pre-position early (launch, login, navigate) then wait until exact time
     // CONFIG.DATE is for which date to book (tee time date), not when to run
     // CONFIG.SCHEDULED_FOR is the exact time when booking opens (when to execute)
     
+    const PRE_POSITION_BUFFER = 60000; // Pre-position 60 seconds (1 minute) before execution
     const now = new Date();
     let scheduledTime = null;
+    let bot = null;
     
     if (CONFIG.SCHEDULED_FOR) {
       scheduledTime = new Date(CONFIG.SCHEDULED_FOR);
       const delayToExecution = scheduledTime - now;
+      const prePositionTime = scheduledTime.getTime() - PRE_POSITION_BUFFER;
+      const delayToPrePosition = prePositionTime - now.getTime();
       
       console.log(`\n⏰ EXECUTION TIMING:`);
       console.log(`   Scheduled for: ${scheduledTime.toLocaleString("en-US", {timeZone: "America/Chicago"})} (Chicago)`);
       console.log(`   Current time: ${now.toLocaleString("en-US", {timeZone: "America/Chicago"})} (Chicago)`);
-      console.log(`   Delay until execution: ${Math.round(delayToExecution / 1000)}s`);
+      console.log(`   Pre-position at: ${new Date(prePositionTime).toLocaleString("en-US", {timeZone: "America/Chicago"})} (Chicago)`);
+      console.log(`   Delay to pre-position: ${Math.round(delayToPrePosition / 1000)}s`);
+      console.log(`   Delay to execution: ${Math.round(delayToExecution / 1000)}s`);
       console.log(`   Tee Time Date: ${CONFIG.DATE || 'Today'}`);
       console.log(`   Time Range: ${CONFIG.TIME_START} - ${CONFIG.TIME_END}\n`);
       
-      // If we need to wait, wait until the exact time
-      if (delayToExecution > 0) {
-        console.log(`⏳ Waiting ${Math.round(delayToExecution / 1000)}s until exact booking opens time...\n`);
+      await updateStatus('running');
+      
+      if (!TEST_MODE) {
+        // Import bot early
+        const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
+        bot = new AustinGolfBookingBot();
+      }
+      
+      // Pre-position phase: launch browser, login, navigate (if we have time)
+      if (delayToPrePosition > 0 && delayToExecution > PRE_POSITION_BUFFER) {
+        console.log(`⏳ Waiting ${Math.round(delayToPrePosition / 1000)}s until pre-position time...\n`);
+        await new Promise(resolve => setTimeout(resolve, delayToPrePosition));
+        
+        console.log(`\n🚀 PRE-POSITIONING NOW (${Math.round(PRE_POSITION_BUFFER / 1000)}s before execution)...\n`);
+        if (TEST_MODE) {
+          console.log('🧪 TEST MODE: Would launch browser, login, and navigate now');
+        } else {
+          await bot.launch();
+          await bot.login();
+          await bot.navigateToBookingPage();
+          console.log(`✅ Pre-positioned! Browser ready, logged in, on booking page.\n`);
+        }
+        
+        // Wait until exact execution time
+        const remainingDelay = scheduledTime - new Date();
+        if (remainingDelay > 0) {
+          console.log(`⏳ Waiting ${Math.round(remainingDelay / 1000)}s until exact booking opens time...\n`);
+          await new Promise(resolve => setTimeout(resolve, remainingDelay));
+        }
+      } else if (delayToExecution > 0) {
+        // Not enough time to pre-position, but we can wait until execution time
+        console.log(`⏳ Waiting ${Math.round(delayToExecution / 1000)}s until exact booking opens time (no pre-position)...\n`);
         await new Promise(resolve => setTimeout(resolve, delayToExecution));
-        console.log(`✅ Booking opens time reached! Executing now...\n`);
       } else if (delayToExecution < -300000) {
         // More than 5 minutes late - probably a problem, but execute anyway
         console.log(`⚠️  Booking opens time was ${Math.round(Math.abs(delayToExecution) / 1000)}s ago, executing anyway...\n`);
       } else {
-        // Within 5 minutes of scheduled time - execute now
-        console.log(`✅ Executing now (${Math.round(Math.abs(delayToExecution) / 1000)}s after scheduled time)\n`);
+        // Within 5 minutes of scheduled time - execute now (no pre-position)
+        console.log(`✅ Executing now (${Math.round(Math.abs(delayToExecution) / 1000)}s after scheduled time, no pre-position)\n`);
       }
+      
+      console.log(`✅ Booking opens time reached! Executing booking now...\n`);
     } else {
       // No scheduled time provided - execute immediately
       console.log(`\n⏰ EXECUTION MODE:`);
       console.log(`   No scheduled time provided - executing immediately`);
       console.log(`   Tee Time Date: ${CONFIG.DATE || 'Today'}`);
       console.log(`   Time Range: ${CONFIG.TIME_START} - ${CONFIG.TIME_END}\n`);
+      
+      await updateStatus('running');
+      
+      if (!TEST_MODE) {
+        const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
+        bot = new AustinGolfBookingBot();
+      }
     }
     
-    await updateStatus('running');
-    
+    // Execute booking
     if (TEST_MODE) {
       console.log('🧪 TEST MODE: Simulating booking (not actually booking)');
       console.log(`🧪 TEST MODE: Would book tee time for date: ${CONFIG.DATE || 'Today'}`);
-      console.log(`🧪 TEST MODE: Would launch browser, login, and book slot`);
       await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate 2 second delay
       console.log('🧪 TEST MODE: Simulated booking complete');
     } else {
-      // Import and use actual bot
-      const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
-      const bot = new AustinGolfBookingBot();
-      await bot.runImmediately();
+      if (!bot) {
+        const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
+        bot = new AustinGolfBookingBot();
+      }
+      
+      // Check if we already pre-positioned (browser is open and on booking page)
+      let alreadyPositioned = false;
+      try {
+        if (bot.page) {
+          const url = await bot.page.url();
+          alreadyPositioned = url && url.includes('search.html');
+        }
+      } catch (e) {
+        alreadyPositioned = false;
+      }
+      
+      if (alreadyPositioned) {
+        // Already positioned - just execute booking
+        console.log('✅ Browser already positioned, executing booking now...\n');
+        await bot.executeBooking();
+      } else {
+        // Need to launch, login, navigate, then execute
+        console.log('🚀 Launching browser and positioning now...\n');
+        await bot.launch();
+        await bot.login();
+        await bot.navigateToBookingPage();
+        await bot.executeBooking();
+      }
     }
     
     await updateStatus('completed');
