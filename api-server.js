@@ -50,6 +50,7 @@ app.post('/api/bookings', async (req, res) => {
       holes,
       timeStart,
       timeEnd,
+      bookingOpensDate,
       targetHour,
       targetMinute,
       testMode
@@ -65,22 +66,29 @@ app.post('/api/bookings', async (req, res) => {
     }
 
     // Calculate scheduled time (when the bot should run)
-    // IMPORTANT: This should be TODAY (when booking opens), NOT the tee time date
-    // The DATE field is for which date to book, not when to run the bot
-    const scheduledDate = new Date(); // Always use today's date for scheduling
+    // Use bookingOpensDate if provided, otherwise default to today
+    // The DATE field is for which date to book the tee time, bookingOpensDate is when to run the bot
+    const scheduledDate = bookingOpensDate ? new Date(bookingOpensDate) : new Date();
     scheduledDate.setHours(parseInt(targetHour), parseInt(targetMinute), 0, 0);
     
-    // If time is in the past by more than 5 minutes, schedule for tomorrow
-    // If it's within the last 5 minutes, use current time (allows immediate execution)
+    // Handle time in the past only if booking opens date is today or not specified
     const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const scheduledDateOnly = new Date(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate());
+    const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
-    if (scheduledDate < fiveMinutesAgo) {
-      scheduledDate.setDate(scheduledDate.getDate() + 1);
-    } else if (scheduledDate < now) {
-      // If target time is in the past but within last 5 minutes, set to now for immediate execution
-      scheduledDate.setTime(now.getTime());
+    // If booking opens date is today and time is in the past, handle special cases
+    if (scheduledDateOnly.getTime() === todayOnly.getTime()) {
+      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+      
+      if (scheduledDate < fiveMinutesAgo) {
+        // More than 5 minutes in the past - schedule for tomorrow
+        scheduledDate.setDate(scheduledDate.getDate() + 1);
+      } else if (scheduledDate < now) {
+        // Within last 5 minutes - execute immediately
+        scheduledDate.setTime(now.getTime());
+      }
     }
+    // If booking opens date is in the future, use it as-is (no adjustment needed)
 
     // Create booking record
     const booking = {

@@ -305,9 +305,9 @@
             </div>
 
             <div class="form-group">
-                <label for="date">Date</label>
+                <label for="date">Tee Time Date</label>
                 <input type="date" id="date" required>
-                <p class="info-text">Select the date you want to book</p>
+                <p class="info-text">Select the date you want to book the tee time for</p>
             </div>
 
             <div class="form-group">
@@ -344,15 +344,21 @@
             </div>
 
             <div class="form-group">
+                <label for="bookingOpensDate">Booking Opens Date</label>
+                <input type="date" id="bookingOpensDate" required>
+                <p class="info-text">When should the bot execute? (Default: Today - leave as is to run today)</p>
+            </div>
+
+            <div class="form-group">
                 <label for="targetHour">Booking Opens At (24-hour)</label>
                 <input type="number" id="targetHour" min="0" max="23" value="7" required>
-                <p class="info-text">Hour when tee times are released (e.g., 7 = 7:00 AM)</p>
+                <p class="info-text">Hour when the bot should execute (e.g., 7 = 7:00 AM)</p>
             </div>
 
             <div class="form-group">
                 <label for="targetMinute">Booking Opens At (Minute)</label>
                 <input type="number" id="targetMinute" min="0" max="59" value="0" required>
-                <p class="info-text">Minute when tee times are released (usually 0)</p>
+                <p class="info-text">Minute when the bot should execute (usually 0)</p>
             </div>
 
             <div class="form-group" style="background: #f8f9fa; padding: 15px; border-radius: 10px; border: 2px solid #e0e0e0;">
@@ -394,6 +400,11 @@
         
         // Set minimum date to today
         document.getElementById('date').min = new Date().toISOString().split('T')[0];
+        
+        // Set booking opens date to today by default
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('bookingOpensDate').value = today;
+        document.getElementById('bookingOpensDate').min = today;
 
         // Load API URL on page load
         if (localStorage.getItem('apiUrl')) {
@@ -468,6 +479,7 @@
                 holes: document.getElementById('holes').value,
                 timeStart: document.getElementById('timeStart').value,
                 timeEnd: document.getElementById('timeEnd').value,
+                bookingOpensDate: document.getElementById('bookingOpensDate').value,
                 targetHour: parseInt(document.getElementById('targetHour').value),
                 targetMinute: parseInt(document.getElementById('targetMinute').value),
                 testMode: document.getElementById('testMode').checked,
