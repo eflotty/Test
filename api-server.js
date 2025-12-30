@@ -68,9 +68,16 @@ app.post('/api/bookings', async (req, res) => {
     const scheduledDate = date ? new Date(date) : new Date();
     scheduledDate.setHours(parseInt(targetHour), parseInt(targetMinute), 0, 0);
     
-    // If time is in the past, schedule for tomorrow
-    if (scheduledDate < new Date()) {
+    // If time is in the past by more than 5 minutes, schedule for tomorrow
+    // If it's within the last 5 minutes, use current time (allows immediate execution)
+    const now = new Date();
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    
+    if (scheduledDate < fiveMinutesAgo) {
       scheduledDate.setDate(scheduledDate.getDate() + 1);
+    } else if (scheduledDate < now) {
+      // If target time is in the past but within last 5 minutes, set to now for immediate execution
+      scheduledDate.setTime(now.getTime());
     }
 
     // Create booking record
