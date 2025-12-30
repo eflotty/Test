@@ -14,7 +14,7 @@ services:
   - type: worker
     name: golf-booking-scheduler
     env: node
-    buildCommand: npm install
+    buildCommand: npm install && npx playwright install chromium
     startCommand: node scheduler.js
     envVars:
       - key: API_URL

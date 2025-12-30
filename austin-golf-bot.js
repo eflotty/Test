@@ -84,15 +84,32 @@ class AustinGolfBookingBot {
   }
 
   async launch() {
-    console.log('🚀 Launching browser in headless mode...');
-    this.browser = await chromium.launch({
-      headless: true,   // Headless mode for cloud deployment
-      slowMo: 0,        // No delay - maximum speed
-      args: [
-        '--disable-blink-features=AutomationControlled',  // Avoid detection
-        '--incognito',  // Run in incognito/private mode
-      ]
-    });
+    try {
+      console.log('🚀 Launching browser in headless mode...');
+      this.browser = await chromium.launch({
+        headless: true,   // Headless mode for cloud deployment
+        slowMo: 0,        // No delay - maximum speed
+        args: [
+          '--disable-blink-features=AutomationControlled',  // Avoid detection
+          '--no-sandbox',  // Required for running in containers/cloud
+          '--disable-setuid-sandbox',  // Required for running in containers
+          '--disable-dev-shm-usage',  // Overcome limited resource problems
+          '--disable-gpu',  // Disable GPU in headless mode
+          '--disable-software-rasterizer',  // Speed optimization
+          '--disable-extensions',  // Speed optimization
+          '--disable-background-networking',  // Speed optimization
+          '--disable-background-timer-throttling',  // Speed optimization
+          '--disable-renderer-backgrounding',  // Speed optimization
+          '--disable-backgrounding-occluded-windows',  // Speed optimization
+        ]
+      });
+    } catch (error) {
+      console.error('❌ Failed to launch browser:', error.message);
+      if (error.message.includes('Executable doesn\'t exist')) {
+        console.error('💡 Playwright browser not installed. Run: npx playwright install chromium');
+      }
+      throw error;
+    }
     
     // Create a fresh context (incognito-like - no cookies, storage, etc.)
     this.context = await this.browser.newContext({
@@ -649,29 +666,32 @@ class AustinGolfBookingBot {
           console.log('✅ Transaction confirmed and processed');
         } else {
           console.log('\n⚠️  Checkout may not have completed automatically');
-          console.log('👆 Please verify in the browser window');
+          // In headless mode, still close - we can't verify visually anyway
         }
         
-        // Keep browser open for verification
+        // Close browser (will close in headless mode, keep open in interactive mode)
         await this.waitForManualCompletion();
       } else {
-        console.log('\n⚠️  No slots available yet. Check the browser window.');
-        console.log('Options:');
-        console.log('  1. Wait for slots to appear and book manually');
-        console.log('  2. Close browser and try again');
-        
+        console.log('\n⚠️  No slots available yet.');
+        // In headless mode, close browser. In interactive mode, keep open.
         await this.waitForManualCompletion();
       }
       
     } catch (error) {
       console.error('\n❌ ERROR during booking:', error.message);
       console.log('\n📸 Taking screenshot for debugging...');
-      await this.page.screenshot({ 
-        path: `error-${Date.now()}.png`, 
-        fullPage: true 
-      });
+      try {
+        if (this.page) {
+          await this.page.screenshot({ 
+            path: `error-${Date.now()}.png`, 
+            fullPage: true 
+          }).catch(e => console.error('⚠️  Screenshot failed:', e.message));
+        }
+      } catch (e) {
+        console.error('⚠️  Screenshot error:', e.message);
+      }
       
-      console.log('\n💡 Browser will stay open for manual intervention');
+      // Close browser in headless mode, keep open in interactive mode
       await this.waitForManualCompletion();
     }
   }
@@ -873,9 +893,33 @@ class AustinGolfBookingBot {
   }
 
   async waitForManualCompletion() {
+    // In headless mode or when called from scheduler, close browser immediately
+    // This prevents hanging forever in cloud deployments
+    if (process.env.SCHEDULED_FOR || process.env.BOOKING_ID) {
+      console.log('\n✅ Booking completed. Closing browser...\n');
+      await this.close();
+      return;
+    }
+    
+    // In interactive mode, keep browser open for manual verification
     console.log('\n⏸️  Browser staying open. Close it when you\'re done.\n');
-    // Keep the process alive
     await new Promise(() => {});
+  }
+
+  async close() {
+    try {
+      if (this.context) {
+        await this.context.close();
+        this.context = null;
+      }
+      if (this.browser) {
+        await this.browser.close();
+        this.browser = null;
+      }
+      console.log('✅ Browser closed successfully');
+    } catch (error) {
+      console.error('⚠️  Error closing browser:', error.message);
+    }
   }
 
   async scheduleBooking() {

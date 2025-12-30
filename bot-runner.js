@@ -41,7 +41,9 @@ async function updateStatus(status, error = null) {
   
   try {
     const http = require('http');
+    const https = require('https');
     const url = new URL(`${CONFIG.API_URL}/api/bookings/${CONFIG.BOOKING_ID}/status`);
+    const client = url.protocol === 'https:' ? https : http;
     const data = JSON.stringify({ status, error });
     
     const options = {
@@ -49,10 +51,14 @@ async function updateStatus(status, error = null) {
       headers: {
         'Content-Type': 'application/json',
         'Content-Length': data.length
-      }
+      },
+      timeout: 5000 // 5 second timeout
     };
     
-    const req = http.request(url, options);
+    const req = client.request(url, options);
+    req.on('timeout', () => {
+      req.destroy();
+    });
     req.write(data);
     req.end();
   } catch (e) {
@@ -217,6 +223,16 @@ async function main() {
         await bot.navigateToBookingPage();
         await bot.executeBooking();
       }
+      
+      // Close browser after completion (bot.executeBooking() will handle this in headless mode)
+      // If bot didn't close it, we close it here
+      try {
+        if (bot.browser) {
+          await bot.close();
+        }
+      } catch (e) {
+        console.error('⚠️  Error closing browser:', e.message);
+      }
     }
     
     await updateStatus('completed');
@@ -230,6 +246,16 @@ async function main() {
     
   } catch (error) {
     console.error('\n❌ Bot execution failed:', error);
+    
+    // Try to close browser if it's still open
+    try {
+      if (typeof bot !== 'undefined' && bot && bot.browser) {
+        await bot.close();
+      }
+    } catch (e) {
+      // Ignore cleanup errors
+    }
+    
     await updateStatus('failed', error.message);
     process.exit(1);
   }

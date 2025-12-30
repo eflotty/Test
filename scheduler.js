@@ -29,7 +29,7 @@ async function fetchUpcomingBookings() {
     const url = new URL(`${API_URL}/api/bookings`);
     const client = getHttpModule(url);
     
-    client.get(url, (res) => {
+    const req = client.get(url, { timeout: 10000 }, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk.toString(); });
       res.on('end', () => {
@@ -44,7 +44,14 @@ async function fetchUpcomingBookings() {
           reject(e);
         }
       });
-    }).on('error', reject);
+    });
+    
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+    req.setTimeout(10000); // 10 second timeout
   });
 }
 
@@ -56,7 +63,7 @@ async function getBookingConfig(bookingId) {
     const url = new URL(`${API_URL}/api/bookings/${bookingId}/config`);
     const client = getHttpModule(url);
     
-    client.get(url, (res) => {
+    const req = client.get(url, { timeout: 10000 }, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk.toString(); });
       res.on('end', () => {
@@ -71,7 +78,14 @@ async function getBookingConfig(bookingId) {
           reject(e);
         }
       });
-    }).on('error', reject);
+    });
+    
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Request timeout'));
+    });
+    req.setTimeout(10000); // 10 second timeout
   });
 }
 
