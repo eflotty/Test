@@ -64,8 +64,10 @@ app.post('/api/bookings', async (req, res) => {
       return res.status(400).json({ error: 'Target hour and minute are required' });
     }
 
-    // Calculate scheduled time
-    const scheduledDate = date ? new Date(date) : new Date();
+    // Calculate scheduled time (when the bot should run)
+    // IMPORTANT: This should be TODAY (when booking opens), NOT the tee time date
+    // The DATE field is for which date to book, not when to run the bot
+    const scheduledDate = new Date(); // Always use today's date for scheduling
     scheduledDate.setHours(parseInt(targetHour), parseInt(targetMinute), 0, 0);
     
     // If time is in the past by more than 5 minutes, schedule for tomorrow
