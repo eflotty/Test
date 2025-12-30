@@ -171,8 +171,9 @@ app.post('/api/bookings', async (req, res) => {
 
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ✅ New booking created: ${booking.id}`);
-    console.log(`[${timestamp}] 📅 Scheduled for: ${scheduledDate.toLocaleString()}`);
-    console.log(`[${timestamp}] ⏰ Target time: ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`);
+    console.log(`[${timestamp}] 📅 Scheduled for (UTC): ${scheduledDate.toISOString()}`);
+    console.log(`[${timestamp}] 📅 Scheduled for (Chicago): ${scheduledDate.toLocaleString("en-US", {timeZone: "America/Chicago"})}`);
+    console.log(`[${timestamp}] ⏰ Target time (Chicago): ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`);
     console.log(`[${timestamp}] 🏌️  Course: ${course}, Players: ${players}, Holes: ${holes}`);
     console.log(`[${timestamp}] 🧪 Test Mode: ${booking.testMode ? 'ENABLED' : 'DISABLED'}`);
 

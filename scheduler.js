@@ -221,14 +221,20 @@ async function checkAndExecuteBookings() {
       const timeUntilExecution = scheduledTime - now;
       
       // Execute if scheduled time is within the next 2 minutes
-      const shouldExecute = timeUntilExecution > 0 && timeUntilExecution <= PRE_POSITION_BUFFER;
+      // Also execute if it's in the past by less than 5 minutes (missed window, but still execute)
+      const shouldExecute = timeUntilExecution > -300000 && timeUntilExecution <= PRE_POSITION_BUFFER;
       
-      if (shouldExecute) {
+      if (shouldExecute && timeUntilExecution > 0) {
         console.log(`   ✅ Booking ${booking.id.substring(0, 8)}... needs execution!`);
-        console.log(`      Scheduled: ${scheduledTime.toLocaleString()}`);
+        console.log(`      Scheduled (UTC): ${scheduledTime.toISOString()}`);
+        console.log(`      Scheduled (Chicago): ${scheduledTime.toLocaleString("en-US", {timeZone: "America/Chicago"})}`);
         console.log(`      Time until: ${Math.round(timeUntilExecution / 1000)}s`);
+      } else if (shouldExecute && timeUntilExecution <= 0) {
+        console.log(`   ✅ Booking ${booking.id.substring(0, 8)}... executing now (missed window by ${Math.round(Math.abs(timeUntilExecution) / 1000)}s)`);
+        console.log(`      Scheduled (UTC): ${scheduledTime.toISOString()}`);
+        console.log(`      Scheduled (Chicago): ${scheduledTime.toLocaleString("en-US", {timeZone: "America/Chicago"})}`);
       } else {
-        console.log(`   ⏳ Booking ${booking.id.substring(0, 8)}... scheduled for ${scheduledTime.toLocaleString()} (${Math.round(timeUntilExecution / 1000)}s away)`);
+        console.log(`   ⏳ Booking ${booking.id.substring(0, 8)}... scheduled for ${scheduledTime.toLocaleString("en-US", {timeZone: "America/Chicago"})} (${Math.round(timeUntilExecution / 1000)}s away)`);
       }
       
       return shouldExecute;
