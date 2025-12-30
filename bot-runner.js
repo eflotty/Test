@@ -87,79 +87,33 @@ async function main() {
   console.log('='.repeat(60) + '\n');
   
   try {
-    // Calculate target time
-    const now = new Date();
-    const target = new Date();
-    target.setHours(CONFIG.TARGET_HOUR, CONFIG.TARGET_MINUTE, CONFIG.TARGET_SECOND, 0);
+    // IMPORTANT: The scheduler already determined the right time to run
+    // We should run immediately, not re-calculate timing
+    // CONFIG.DATE is for which date to book (tee time date), not when to run
+    // CONFIG.TARGET_HOUR/TARGET_MINUTE were used by scheduler, we don't need them here
     
-    // If date is specified, use that date
-    if (CONFIG.DATE) {
-      const [year, month, day] = CONFIG.DATE.split('-');
-      target.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
-    }
+    console.log(`\n⏰ EXECUTION MODE:`);
+    console.log(`   Scheduler triggered bot execution`);
+    console.log(`   Bot will run immediately to book tee time`);
+    console.log(`   Tee Time Date: ${CONFIG.DATE || 'Today'}`);
+    console.log(`   Time Range: ${CONFIG.TIME_START} - ${CONFIG.TIME_END}\n`);
     
-    // If target time is in the past, schedule for tomorrow
-    if (target <= now) {
-      target.setDate(target.getDate() + 1);
-    }
+    await updateStatus('running');
     
-    const delayToExecution = target - now;
-    
-    console.log(`\n⏰ TIMING CALCULATION:`);
-    console.log(`   Current time: ${now.toLocaleString()}`);
-    console.log(`   Target time:  ${target.toLocaleString()}`);
-    console.log(`   Delay: ${Math.round(delayToExecution / 1000)}s (${Math.round(delayToExecution / 60000)} minutes)\n`);
-    
-    if (delayToExecution < 0) {
-      console.log('⚠️  Target time is in the past! Running immediately...\n');
-      await updateStatus('running');
-      
-      if (TEST_MODE) {
-        console.log('🧪 TEST MODE: Simulating booking (not actually booking)');
-        console.log('🧪 TEST MODE: Would launch browser, login, and book slot');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate 2 second delay
-        console.log('🧪 TEST MODE: Simulated booking complete');
-      } else {
-        await bot.runImmediately();
-      }
-      
-      await updateStatus('completed');
+    if (TEST_MODE) {
+      console.log('🧪 TEST MODE: Simulating booking (not actually booking)');
+      console.log(`🧪 TEST MODE: Would book tee time for date: ${CONFIG.DATE || 'Today'}`);
+      console.log(`🧪 TEST MODE: Would launch browser, login, and book slot`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate 2 second delay
+      console.log('🧪 TEST MODE: Simulated booking complete');
     } else {
-      console.log(`⏰ Scheduling for ${target.toLocaleString()}`);
-      console.log(`   Will execute in: ${Math.round(delayToExecution / 1000)}s\n`);
-      
-      await updateStatus('running');
-      
-      if (TEST_MODE) {
-        console.log('🧪 TEST MODE: Simulating scheduled booking');
-        console.log(`🧪 TEST MODE: Will simulate at ${target.toLocaleString()}`);
-        console.log(`🧪 TEST MODE: Waiting ${Math.round(delayToExecution / 1000)}s until execution time...\n`);
-        
-        // In test mode, wait until execution time and log
-        await new Promise(resolve => setTimeout(resolve, delayToExecution));
-        
-        const execTime = new Date();
-        console.log(`\n${'='.repeat(60)}`);
-        console.log(`🧪 [${execTime.toLocaleString()}] TEST MODE: EXECUTION TIME REACHED!`);
-        console.log(`🧪 Target was: ${target.toLocaleString()}`);
-        console.log(`🧪 Actual time: ${execTime.toLocaleString()}`);
-        console.log(`🧪 Difference: ${Math.round((execTime - target) / 1000)}s`);
-        console.log(`🧪 TEST MODE: Would launch browser, login, and book slot`);
-        console.log(`🧪 TEST MODE: Simulated booking complete`);
-        console.log('='.repeat(60));
-      } else {
-        // Import and use actual bot
-        const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
-        // Note: The bot class uses global CONFIG, so we need to set it
-        // For now, we'll need to modify the bot to accept config
-        // This is a limitation - for production, refactor bot to accept config
-        console.log('⚠️  Real booking mode requires bot refactoring');
-        console.log('⚠️  For now, use TEST_MODE=true to verify timing');
-        await updateStatus('failed', 'Real booking mode not yet implemented - use TEST_MODE');
-      }
-      
-      await updateStatus('completed');
+      // Import and use actual bot
+      const { AustinGolfBookingBot } = require('./austin-golf-bot.js');
+      const bot = new AustinGolfBookingBot();
+      await bot.runImmediately();
     }
+    
+    await updateStatus('completed');
     
     const endTime = new Date();
     console.log(`\n${'='.repeat(60)}`);
