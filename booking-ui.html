@@ -404,13 +404,10 @@
         // Set booking opens date to today in Chicago CST timezone
         function getTodayChicagoCST() {
             const now = new Date();
-            // Chicago is UTC-6 (CST) or UTC-5 (CDT)
-            // Get Chicago time by creating date in that timezone
-            const chicagoTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-            const year = chicagoTime.getFullYear();
-            const month = String(chicagoTime.getMonth() + 1).padStart(2, '0');
-            const day = String(chicagoTime.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+            // Format date in Chicago timezone
+            const chicagoDateStr = now.toLocaleDateString("en-CA", {timeZone: "America/Chicago"});
+            // Returns YYYY-MM-DD format
+            return chicagoDateStr;
         }
         
         const todayChicago = getTodayChicagoCST();
