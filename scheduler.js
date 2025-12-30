@@ -147,6 +147,7 @@ async function executeBot(bookingConfig) {
       TIME_END: bookingConfig.timeEnd,
       TARGET_HOUR: bookingConfig.targetHour,
       TARGET_MINUTE: bookingConfig.targetMinute,
+      SCHEDULED_FOR: bookingConfig.scheduledFor, // Pass the exact scheduled time
       API_URL: API_URL,
       TEST_MODE: testModeValue
     };

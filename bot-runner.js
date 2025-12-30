@@ -23,6 +23,7 @@ const CONFIG = {
   TARGET_SECOND: 0,
   PRE_POSITION_SECONDS: 45,
   BOOKING_ID: process.env.BOOKING_ID,
+  SCHEDULED_FOR: process.env.SCHEDULED_FOR || null, // Exact time when booking should execute
   API_URL: process.env.API_URL || 'http://localhost:3000'
 };
 
@@ -87,16 +88,44 @@ async function main() {
   console.log('='.repeat(60) + '\n');
   
   try {
-    // IMPORTANT: The scheduler already determined the right time to run
-    // We should run immediately, not re-calculate timing
+    // IMPORTANT: The scheduler triggers the bot when scheduledFor is within 2 minutes
+    // We should wait until the exact scheduledFor time, then execute
     // CONFIG.DATE is for which date to book (tee time date), not when to run
-    // CONFIG.TARGET_HOUR/TARGET_MINUTE were used by scheduler, we don't need them here
+    // CONFIG.SCHEDULED_FOR is the exact time when booking opens (when to execute)
     
-    console.log(`\n⏰ EXECUTION MODE:`);
-    console.log(`   Scheduler triggered bot execution`);
-    console.log(`   Bot will run immediately to book tee time`);
-    console.log(`   Tee Time Date: ${CONFIG.DATE || 'Today'}`);
-    console.log(`   Time Range: ${CONFIG.TIME_START} - ${CONFIG.TIME_END}\n`);
+    const now = new Date();
+    let scheduledTime = null;
+    
+    if (CONFIG.SCHEDULED_FOR) {
+      scheduledTime = new Date(CONFIG.SCHEDULED_FOR);
+      const delayToExecution = scheduledTime - now;
+      
+      console.log(`\n⏰ EXECUTION TIMING:`);
+      console.log(`   Scheduled for: ${scheduledTime.toLocaleString("en-US", {timeZone: "America/Chicago"})} (Chicago)`);
+      console.log(`   Current time: ${now.toLocaleString("en-US", {timeZone: "America/Chicago"})} (Chicago)`);
+      console.log(`   Delay until execution: ${Math.round(delayToExecution / 1000)}s`);
+      console.log(`   Tee Time Date: ${CONFIG.DATE || 'Today'}`);
+      console.log(`   Time Range: ${CONFIG.TIME_START} - ${CONFIG.TIME_END}\n`);
+      
+      // If we need to wait, wait until the exact time
+      if (delayToExecution > 0) {
+        console.log(`⏳ Waiting ${Math.round(delayToExecution / 1000)}s until exact booking opens time...\n`);
+        await new Promise(resolve => setTimeout(resolve, delayToExecution));
+        console.log(`✅ Booking opens time reached! Executing now...\n`);
+      } else if (delayToExecution < -300000) {
+        // More than 5 minutes late - probably a problem, but execute anyway
+        console.log(`⚠️  Booking opens time was ${Math.round(Math.abs(delayToExecution) / 1000)}s ago, executing anyway...\n`);
+      } else {
+        // Within 5 minutes of scheduled time - execute now
+        console.log(`✅ Executing now (${Math.round(Math.abs(delayToExecution) / 1000)}s after scheduled time)\n`);
+      }
+    } else {
+      // No scheduled time provided - execute immediately
+      console.log(`\n⏰ EXECUTION MODE:`);
+      console.log(`   No scheduled time provided - executing immediately`);
+      console.log(`   Tee Time Date: ${CONFIG.DATE || 'Today'}`);
+      console.log(`   Time Range: ${CONFIG.TIME_START} - ${CONFIG.TIME_END}\n`);
+    }
     
     await updateStatus('running');
     
